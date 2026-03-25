@@ -247,7 +247,6 @@ jobs:
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     environment:
       name: staging
-      url: http://${{ secrets.STAGING_HOST }}
 
     steps:
       - uses: actions/checkout@v4
@@ -297,7 +296,6 @@ jobs:
     # Settings → Environments → production → Required reviewers
     environment:
       name: production
-      url: https://${{ secrets.PROD_HOST }}
 
     steps:
       - uses: actions/checkout@v4

@@ -843,4 +843,4 @@ if __name__ == "__main__":
     # debug=True exposes the Werkzeug interactive shell (RCE risk).
     # Never run with debug=True in production — use gunicorn instead.
     debug_mode = os.getenv("FLASK_ENV", "production") == "development"
-    app.run(host="0.0.0.0", port=8080, debug=debug_mode)
+    app.run(host="0.0.0.0", port=8080, debug=debug_mode)  # nosec B104

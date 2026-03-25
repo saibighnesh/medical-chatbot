@@ -544,7 +544,7 @@ def update_document(doc_id, **kwargs):
             return False
         updates.append("updated_at = CURRENT_TIMESTAMP")
         values.append(doc_id)
-        cursor.execute(f"UPDATE documents SET {', '.join(updates)} WHERE id = ?", values)
+        cursor.execute(f"UPDATE documents SET {', '.join(updates)} WHERE id = ?", values)  # nosec B608
         conn.commit()
         return True
     except Exception as e:

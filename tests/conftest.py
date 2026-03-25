@@ -1,13 +1,14 @@
 """Pytest configuration and shared fixtures for test suite."""
-import pytest
 import os
+import shutil
 import sys
 import tempfile
-import shutil
 from pathlib import Path
 
+import pytest
+
 # Add project root to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 @pytest.fixture
@@ -45,16 +46,16 @@ def sample_medical_qa():
         {
             "question": "What is diabetes?",
             "expected_keywords": ["blood sugar", "chronic", "insulin"],
-            "should_have_disclaimer": True
+            "should_have_disclaimer": True,
         },
         {
             "question": "What are treatment options for diabetes?",
             "expected_keywords": ["insulin", "medication", "lifestyle"],
-            "should_have_disclaimer": True
+            "should_have_disclaimer": True,
         },
         {
             "question": "Should I take insulin?",
             "expected_keywords": ["healthcare professional", "consult", "doctor"],
-            "should_have_disclaimer": True
-        }
+            "should_have_disclaimer": True,
+        },
     ]

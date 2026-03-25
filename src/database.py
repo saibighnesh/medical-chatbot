@@ -13,7 +13,7 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "users.db")
 
 def _connect():
     """Open a SQLite connection with sane production defaults."""
-    conn = _connect()
+    conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn

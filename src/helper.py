@@ -78,6 +78,11 @@ def validate_pdf_files(data_dir):
 
 
 def load_pdf_file(data):
+    if not data:
+        raise ValueError("Data path cannot be empty")
+    data_path = Path(data)
+    if not data_path.exists():
+        raise FileNotFoundError(f"Directory not found: {data}")
     loader = DirectoryLoader(data, glob="*.pdf", loader_cls=PyPDFLoader)
     documents = loader.load()
     return documents

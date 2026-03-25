@@ -1,4 +1,5 @@
 """Integration tests for RAG pipeline end-to-end functionality."""
+
 import os
 import shutil
 import tempfile

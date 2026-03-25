@@ -1,4 +1,5 @@
 """API tests for Flask application endpoints."""
+
 import json
 import os
 import sys
@@ -42,10 +43,12 @@ def app():
     mock_user.is_anonymous = False
     mock_user.is_active = True
 
-    with patch("app.download_hugging_face_embeddings", return_value=mock_embeddings), patch(
-        "app.FAISS"
-    ) as mock_faiss_cls, patch("app.get_llm_factory") as mock_factory, patch("app.current_user", mock_user), patch(
-        "app.load_dotenv"
+    with (
+        patch("app.download_hugging_face_embeddings", return_value=mock_embeddings),
+        patch("app.FAISS") as mock_faiss_cls,
+        patch("app.get_llm_factory") as mock_factory,
+        patch("app.current_user", mock_user),
+        patch("app.load_dotenv"),
     ):
         mock_faiss_cls.load_local.return_value.as_retriever.return_value = mock_retriever
 
@@ -248,9 +251,11 @@ class TestAdminRoutes:
 
 class TestDashboardKeyRoutes:
     def test_list_keys(self, client):
-        with patch("app.list_api_keys", return_value=[]), patch("app.get_active_provider", return_value=None), patch(
-            "app.current_user"
-        ) as mu:
+        with (
+            patch("app.list_api_keys", return_value=[]),
+            patch("app.get_active_provider", return_value=None),
+            patch("app.current_user") as mu,
+        ):
             mu.is_admin = True
             response = client.get("/dashboard/api/keys")
             assert response.status_code == 200
@@ -258,9 +263,11 @@ class TestDashboardKeyRoutes:
             assert "keys" in data
 
     def test_save_key_valid(self, client):
-        with patch("app.save_api_key", return_value=True), patch("app.log_admin_action"), patch(
-            "app.current_user"
-        ) as mu:
+        with (
+            patch("app.save_api_key", return_value=True),
+            patch("app.log_admin_action"),
+            patch("app.current_user") as mu,
+        ):
             mu.is_admin = True
             mu.id = 1
             response = client.post("/dashboard/api/keys", json={"provider": "gemini", "api_key": "AIzaSy-test"})
@@ -280,9 +287,10 @@ class TestDashboardKeyRoutes:
             assert response.status_code == 400
 
     def test_validate_key_route_exists(self, client):
-        with patch("app.llm_validate_api_key", return_value={"valid": True, "message": "OK"}), patch(
-            "app.current_user"
-        ) as mu:
+        with (
+            patch("app.llm_validate_api_key", return_value={"valid": True, "message": "OK"}),
+            patch("app.current_user") as mu,
+        ):
             mu.is_admin = True
             response = client.post(
                 "/dashboard/api/keys/validate", json={"provider": "gemini", "api_key": "AIzaSy-test"}

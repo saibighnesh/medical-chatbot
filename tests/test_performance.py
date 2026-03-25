@@ -1,4 +1,5 @@
 """Performance and load tests for medical chatbot."""
+
 import os
 import statistics
 import time

@@ -26,8 +26,7 @@ def init_db():
     cursor = conn.cursor()
 
     # Users table with is_admin column
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -36,12 +35,10 @@ def init_db():
             is_admin INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """
-    )
+    """)
 
     # Chat history table
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS chat_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -50,12 +47,10 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
-    """
-    )
+    """)
 
     # API keys table for storing encrypted LLM provider credentials
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS api_keys (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             provider_name TEXT UNIQUE NOT NULL,
@@ -64,12 +59,10 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """
-    )
+    """)
 
     # Documents metadata table
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT UNIQUE NOT NULL,
@@ -83,38 +76,30 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """
-    )
+    """)
 
     # Create index on filename and is_active for fast lookups
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_documents_filename
         ON documents(filename)
-    """
-    )
-    cursor.execute(
-        """
+    """)
+    cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_documents_active
         ON documents(is_active)
-    """
-    )
+    """)
 
     # System settings table
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             key TEXT UNIQUE NOT NULL,
             value TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """
-    )
+    """)
 
     # Audit log table for tracking admin actions
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -124,8 +109,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
-    """
-    )
+    """)
 
     conn.commit()
 
@@ -312,13 +296,11 @@ def list_api_keys(show_keys=False):
     conn = _connect()
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT provider_name, api_key_encrypted, is_active, updated_at
             FROM api_keys
             ORDER BY provider_name
-        """
-        )
+        """)
         results = cursor.fetchall()
         keys = []
         for row in results:
@@ -380,14 +362,12 @@ def get_active_provider():
     conn = _connect()
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT provider_name, api_key_encrypted
             FROM api_keys
             WHERE is_active = 1
             LIMIT 1
-        """
-        )
+        """)
         result = cursor.fetchone()
         if result:
             provider, encrypted_key = result

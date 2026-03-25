@@ -1,0 +1,351 @@
+# ============================================================
+# CI/CD Pipeline — Medical Chatbot
+# ============================================================
+#
+# Jobs per event:
+#
+#  Pull Request  →  lint  →  security  →  test
+#  Push develop  →  lint  →  security  →  test  →  build  →  deploy-staging
+#  Push main     →  lint  →  security  →  test  →  build  →  deploy-production (approval required)
+#
+# Required GitHub Secrets (Settings → Secrets → Actions):
+#   STAGING_HOST        IP / hostname of staging server
+#   STAGING_USER        SSH username on staging server
+#   STAGING_SSH_KEY     Private SSH key for staging
+#   PROD_HOST           IP / hostname of production server
+#   PROD_USER           SSH username on production server
+#   PROD_SSH_KEY        Private SSH key for production
+#   SECRET_KEY          Flask SECRET_KEY (used in tests)
+#   CODECOV_TOKEN       (optional) Codecov upload token
+#
+# Image registry: ghcr.io (uses built-in GITHUB_TOKEN — no extra secret needed)
+# ============================================================
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}   # e.g. youruser/medical-chatbot
+  PYTHON_VERSION: "3.10"
+
+# Cancel previous runs for the same branch (saves runner minutes)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ────────────────────────────────────────────────────────────
+# JOB 1 — Lint & format check
+# ────────────────────────────────────────────────────────────
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install lint tools
+        run: pip install flake8 black isort
+
+      - name: flake8 — style & error check
+        run: |
+          flake8 app.py src/ store_index.py \
+            --max-line-length=120 \
+            --extend-ignore=E203,W503 \
+            --exclude=__pycache__,.git,venv
+
+      - name: black — format check (non-destructive)
+        run: black --check --line-length 120 app.py src/ store_index.py
+
+      - name: isort — import order check
+        run: isort --check-only --line-length 120 --profile black app.py src/ store_index.py
+
+# ────────────────────────────────────────────────────────────
+# JOB 2 — Security scanning
+# ────────────────────────────────────────────────────────────
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install security tools
+        run: pip install bandit safety
+
+      - name: bandit — static application security testing
+        run: |
+          bandit -r app.py src/ \
+            -ll \
+            --skip B101,B601 \
+            -f json -o bandit-report.json || true
+          bandit -r app.py src/ -ll --skip B101,B601
+
+      - name: safety — dependency vulnerability check
+        run: safety check -r requirements.txt --full-report
+        continue-on-error: true   # warn but don't block on third-party advisories
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+          retention-days: 30
+
+# ────────────────────────────────────────────────────────────
+# JOB 3 — Tests & coverage
+# ────────────────────────────────────────────────────────────
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: [lint]           # Don't waste time running tests if lint fails
+
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY || 'ci-test-secret-key-for-github-actions' }}
+      FLASK_ENV: testing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-flask pytest-mock
+
+      # Run only the fast (mocked) unit & API tests in CI.
+      # Integration tests that download the real embedding model
+      # are tagged @pytest.mark.integration and run separately (see integration.yml).
+      - name: Run unit & API tests
+        run: |
+          pytest tests/test_api.py tests/test_helper.py \
+            -v \
+            --cov=src --cov=app \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing \
+            --cov-fail-under=60 \
+            -m "not integration and not slow"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14
+
+# ────────────────────────────────────────────────────────────
+# JOB 4 — Build & push Docker image
+# (only on push to main or develop, not on PRs)
+# ────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [lint, security, test]
+    if: github.event_name == 'push'
+
+    permissions:
+      contents: read
+      packages: write        # required to push to ghcr.io
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generates tags:
+      #   main  → latest  + sha-<short>
+      #   develop → develop + sha-<short>
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          format: table
+          exit-code: 0           # warn but don't fail the build
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      - name: Summary
+        run: |
+          echo "### Docker Image Built 🐳" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** ${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+
+# ────────────────────────────────────────────────────────────
+# JOB 5 — Deploy to Staging  (develop branch only)
+# ────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy → Staging
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: http://${{ secrets.STAGING_HOST }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/medical-chatbot
+
+            echo "Pulling latest image..."
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop
+
+            echo "Restarting services..."
+            docker-compose -f docker-compose.yml pull medbot
+            docker-compose -f docker-compose.yml up -d --no-deps --force-recreate medbot
+
+            echo "Waiting for health check..."
+            sleep 10
+            curl -sf http://localhost:8080/health || (docker-compose logs medbot && exit 1)
+
+            echo "Cleaning up old images..."
+            docker image prune -f
+
+      - name: Staging deploy summary
+        run: |
+          echo "### Deployed to Staging ✅" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** develop" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** http://${{ secrets.STAGING_HOST }}" >> $GITHUB_STEP_SUMMARY
+
+# ────────────────────────────────────────────────────────────
+# JOB 6 — Deploy to Production  (main branch, approval required)
+# ────────────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy → Production
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    # 'production' environment must be configured in GitHub:
+    # Settings → Environments → production → Required reviewers
+    environment:
+      name: production
+      url: https://${{ secrets.PROD_HOST }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/medical-chatbot
+
+            echo "Pulling latest image..."
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            echo "Creating backup snapshot..."
+            docker tag $(docker inspect --format='{{.Id}}' medicalchatbot-medbot 2>/dev/null || echo "scratch") \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:rollback || true
+
+            echo "Rolling deploy..."
+            docker-compose -f docker-compose.yml pull medbot
+            docker-compose -f docker-compose.yml up -d --no-deps --force-recreate medbot
+
+            echo "Waiting for health check (60s)..."
+            for i in $(seq 1 12); do
+              if curl -sf http://localhost:8080/health; then
+                echo "Health check passed after ${i}x5s"
+                break
+              fi
+              if [ $i -eq 12 ]; then
+                echo "Health check failed — rolling back"
+                docker-compose -f docker-compose.yml down medbot
+                docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:rollback medicalchatbot-medbot
+                docker-compose -f docker-compose.yml up -d medbot
+                exit 1
+              fi
+              sleep 5
+            done
+
+            echo "Cleaning up old images..."
+            docker image prune -f
+
+      - name: Production deploy summary
+        run: |
+          echo "### Deployed to Production 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** main" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY

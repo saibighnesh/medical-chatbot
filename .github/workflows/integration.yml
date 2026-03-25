@@ -1,0 +1,93 @@
+# ============================================================
+# Integration Tests — Medical Chatbot
+# ============================================================
+#
+# Runs the slow integration tests that download the real
+# HuggingFace embedding model and exercise the full RAG pipeline.
+#
+# Triggered:
+#   - Manually (workflow_dispatch)
+#   - Nightly at 02:00 UTC on main
+#   - On push to main (after the fast CI/CD pipeline passes)
+#
+# These tests are intentionally excluded from the main ci-cd.yml
+# because they download ~90 MB of model weights and take 3-5 min.
+# ============================================================
+
+name: Integration Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"   # 02:00 UTC every night
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    branches: [main]
+    types: [completed]
+
+env:
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    # Only run when triggered manually/on schedule, or when the upstream CI passed
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY || 'integration-test-secret-key' }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || '' }}
+      FLASK_ENV: testing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-flask pytest-mock
+
+      # Cache the HuggingFace model weights so subsequent runs are fast
+      - name: Cache HuggingFace models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-sentence-transformers-all-MiniLM-L6-v2
+          restore-keys: |
+            hf-${{ runner.os }}-sentence-transformers-
+
+      - name: Run integration tests
+        run: |
+          pytest tests/ \
+            -v \
+            --cov=src --cov=app \
+            --cov-report=xml:coverage-integration.xml \
+            --cov-report=term-missing \
+            -m "integration or slow" \
+            --timeout=300
+
+      - name: Upload integration coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage-integration.xml
+          flags: integration
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-coverage-report
+          path: coverage-integration.xml
+          retention-days: 14

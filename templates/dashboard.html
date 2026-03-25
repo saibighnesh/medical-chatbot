@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – Medical Chatbot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --accent: #6c63ff;
+      --accent2: #8b83ff;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top bar ─────────────────────────────────────── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar-brand { font-weight: 700; font-size: 18px; letter-spacing: -.3px; }
+    .topbar-brand span { color: var(--accent2); }
+    .topbar-right { display: flex; align-items: center; gap: 16px; font-size: 14px; color: var(--muted); }
+    .topbar-right a { color: var(--accent2); text-decoration: none; font-size: 13px; }
+    .topbar-right a:hover { text-decoration: underline; }
+
+    /* ── Layout ──────────────────────────────────────── */
+    .layout { display: flex; flex: 1; }
+
+    /* ── Sidebar ─────────────────────────────────────── */
+    .sidebar {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 16px;
+      flex-shrink: 0;
+    }
+    .nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; padding: 0 8px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 8px;
+      cursor: pointer; font-size: 14px; color: var(--muted);
+      transition: background .15s, color .15s;
+      margin-bottom: 2px;
+      border: none; background: none; width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: var(--surface2); color: var(--text); }
+    .nav-item.active { background: rgba(108,99,255,.18); color: var(--accent2); }
+    .nav-icon { font-size: 16px; }
+    .nav-sep { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    /* ── Main area ───────────────────────────────────── */
+    .main { flex: 1; padding: 32px 36px; overflow-y: auto; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── Stats row ───────────────────────────────────── */
+    .stats-row { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 22px; flex: 1; min-width: 140px;
+    }
+    .stat-card .s-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .stat-card .s-value { font-size: 28px; font-weight: 700; }
+    .stat-card .s-value.green { color: var(--green); }
+    .stat-card .s-value.accent { color: var(--accent2); }
+    .stat-card .s-value.yellow { color: var(--yellow); }
+
+    /* ── Section header ──────────────────────────────── */
+    .section-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+    .section-sub { font-size: 13px; color: var(--muted); margin-top: 4px; font-weight: 400; }
+
+    /* ── Provider cards ──────────────────────────────── */
+    .provider-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+    .provider-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px;
+      transition: border-color .2s;
+    }
+    .provider-card.is-active { border-color: var(--accent); }
+    .provider-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .provider-name { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
+    .provider-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .icon-gemini { background: #1a3a6b; }
+    .icon-openai { background: #1a3a2b; }
+    .icon-claude { background: #3a1a2b; }
+    .badge {
+      font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .badge-active { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+    .badge-inactive { background: rgba(148,163,184,.1); color: var(--muted); border: 1px solid var(--border); }
+    .badge-saved { background: rgba(108,99,255,.15); color: var(--accent2); border: 1px solid rgba(108,99,255,.3); }
+
+    .key-preview { font-size: 12px; color: var(--muted); margin-bottom: 12px; font-family: monospace; }
+
+    .input-row { display: flex; gap: 8px; }
+    .input-field {
+      flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 12px; color: var(--text);
+      font-size: 13px; outline: none; transition: border-color .15s;
+    }
+    .input-field:focus { border-color: var(--accent); }
+    .input-field::placeholder { color: var(--muted); }
+
+    .btn {
+      padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer;
+      font-size: 13px; font-weight: 600; transition: opacity .15s, background .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-red { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .card-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+    /* ── Documents table ─────────────────────────────── */
+    .doc-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .doc-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { background: var(--surface2); padding: 11px 16px; text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+    tbody tr { border-top: 1px solid var(--border); }
+    tbody tr:hover { background: rgba(255,255,255,.02); }
+    td { padding: 12px 16px; vertical-align: middle; }
+    .doc-name { font-weight: 500; }
+    .doc-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+    .dot-green { background: var(--green); }
+    .dot-red { background: var(--red); }
+    .dot-yellow { background: var(--yellow); }
+    .dot-gray { background: var(--muted); }
+    .td-actions { display: flex; gap: 6px; align-items: center; }
+
+    /* ── Upload area ─────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: 28px; text-align: center; background: var(--surface);
+      transition: border-color .2s, background .2s; cursor: pointer;
+      margin-bottom: 18px;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: rgba(108,99,255,.06); }
+    .upload-zone .uz-icon { font-size: 36px; margin-bottom: 10px; }
+    .upload-zone p { color: var(--muted); font-size: 14px; }
+    .upload-zone label { cursor: pointer; color: var(--accent2); font-weight: 600; }
+    #fileInput { display: none; }
+
+    /* ── Reindex section ─────────────────────────────── */
+    .reindex-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px; margin-top: 28px;
+    }
+    .reindex-box h3 { font-size: 16px; margin-bottom: 8px; }
+    .reindex-box p { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+
+    /* ── Toast ───────────────────────────────────────── */
+    #toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 100; }
+    .toast {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 13px 18px; font-size: 13px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.4);
+      animation: slideIn .25s ease;
+      min-width: 260px; max-width: 360px;
+    }
+    .toast.t-success { border-left: 3px solid var(--green); }
+    .toast.t-error   { border-left: 3px solid var(--red); }
+    .toast.t-info    { border-left: 3px solid var(--accent); }
+    @keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ── Progress bar ────────────────────────────────── */
+    .prog-wrap { height: 6px; background: var(--border); border-radius: 3px; margin-top: 12px; display: none; }
+    .prog-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 3px; transition: width .3s; }
+
+    /* ── Spinner ─────────────────────────────────────── */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state { text-align: center; padding: 48px 16px; color: var(--muted); font-size: 14px; }
+    .empty-state .es-icon { font-size: 40px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-brand">Medical<span>Bot</span> Dashboard</div>
+    <div class="topbar-right">
+      <span>{{ username }}</span>
+      <a href="/">← Chatbot</a>
+      <a href="/logout">Logout</a>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="nav-label">Management</div>
+      <button class="nav-item active" data-page="keys" onclick="showPage('keys', this)">
+        <span class="nav-icon">🔑</span> API Keys
+      </button>
+      <button class="nav-item" data-page="docs" onclick="showPage('docs', this)">
+        <span class="nav-icon">📄</span> Documents
+      </button>
+      <hr class="nav-sep" />
+      <div class="nav-label">Other</div>
+      <button class="nav-item" onclick="window.location='/'">
+        <span class="nav-icon">💬</span> Chatbot
+      </button>
+      <button class="nav-item" onclick="window.location='/admin'">
+        <span class="nav-icon">🔧</span> Legacy Admin
+      </button>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+
+      <!-- ── API Keys page ── -->
+      <div id="page-keys" class="page active">
+        <div class="section-title">
+          API Keys
+          <div class="section-sub">Configure which LLM provider powers your chatbot</div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="stats-row" id="stats-row">
+          <div class="stat-card">
+            <div class="s-label">Active Provider</div>
+            <div class="s-value accent" id="stat-provider">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="s-label">PDF Documents</div>
+            <div class="s-value green" id="stat-pdfs">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="s-label">FAISS Index</div>
+            <div class="s-value" id="stat-index">—</div>
+          </div>
+        </div>
+
+        <div class="provider-grid" id="provider-grid">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- ── Documents page ── -->
+      <div id="page-docs" class="page">
+        <div class="section-title">
+          Documents
+          <div class="section-sub">Manage PDF knowledge base files</div>
+        </div>
+
+        <!-- Upload zone -->
+        <div class="upload-zone" id="uploadZone">
+          <div class="uz-icon">📁</div>
+          <p>Drag &amp; drop a PDF here, or <label for="fileInput">browse</label></p>
+          <p style="font-size:12px;margin-top:6px">PDF files only · max 50 MB</p>
+          <input type="file" id="fileInput" accept=".pdf" />
+        </div>
+        <div class="prog-wrap" id="uploadProg"><div class="prog-fill" id="uploadProgFill" style="width:0%"></div></div>
+
+        <!-- Doc list toolbar -->
+        <div class="doc-toolbar">
+          <span style="font-size:14px;font-weight:600;">Knowledge Base Files</span>
+          <button class="btn btn-outline btn-sm" onclick="loadDocs()">↻ Refresh</button>
+        </div>
+
+        <div class="doc-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Size</th>
+                <th>Pages</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="docs-tbody">
+              <tr><td colspan="5"><div class="empty-state"><div class="es-icon">📂</div>Loading…</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Re-index -->
+        <div class="reindex-box">
+          <h3>🔄 Rebuild Search Index</h3>
+          <p>Processes all active PDFs and rebuilds the FAISS vector index. Required after uploading new documents.</p>
+          <button class="btn btn-accent" id="reindexBtn" onclick="triggerReindex()">Rebuild Index</button>
+          <div class="prog-wrap" id="reindexProg"><div class="prog-fill" style="width:100%"></div></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <script>
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    function toast(msg, type = 'info') {
+      const tc = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      el.className = `toast t-${type}`;
+      el.innerHTML = `<span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span><span>${msg}</span>`;
+      tc.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+
+    function fmt(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function showPage(name, btn) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('page-' + name).classList.add('active');
+      btn.classList.add('active');
+      if (name === 'keys') loadKeys();
+      if (name === 'docs') loadDocs();
+    }
+
+    async function apiFetch(url, opts = {}) {
+      const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+      return r.json();
+    }
+
+    // ── Stats ──────────────────────────────────────────────────────────────
+
+    async function loadStats() {
+      const d = await apiFetch('/dashboard/api/stats');
+      document.getElementById('stat-provider').textContent = d.active_provider || '—';
+      document.getElementById('stat-pdfs').textContent = d.pdf_count ?? '—';
+      const idx = document.getElementById('stat-index');
+      idx.textContent = d.index_exists ? '✓ Ready' : '✗ Missing';
+      idx.className = 's-value ' + (d.index_exists ? 'green' : 'red' );
+    }
+
+    // ── API Keys ───────────────────────────────────────────────────────────
+
+    const PROVIDERS = [
+      { id: 'gemini', label: 'Gemini', icon: '🔵', iconClass: 'icon-gemini',
+        placeholder: 'AIzaSy…', hint: 'Google AI Studio key' },
+      { id: 'openai', label: 'OpenAI', icon: '🟢', iconClass: 'icon-openai',
+        placeholder: 'sk-…', hint: 'OpenAI API key' },
+      { id: 'claude', label: 'Claude', icon: '🟣', iconClass: 'icon-claude',
+        placeholder: 'sk-ant-…', hint: 'Anthropic API key' },
+    ];
+
+    let keysData = {};
+    let activeProvider = null;
+
+    async function loadKeys() {
+      const d = await apiFetch('/dashboard/api/keys');
+      keysData = {};
+      (d.keys || []).forEach(k => keysData[k.provider] = k);
+      activeProvider = d.active_provider;
+      renderProviderCards();
+      loadStats();
+    }
+
+    function renderProviderCards() {
+      const grid = document.getElementById('provider-grid');
+      grid.innerHTML = PROVIDERS.map(p => {
+        const info = keysData[p.id];
+        const isActive = activeProvider === p.id;
+        const hasSaved = info && info.has_key;
+        const preview = hasSaved && info.key_preview ? info.key_preview : null;
+
+        return `
+          <div class="provider-card ${isActive ? 'is-active' : ''}" id="card-${p.id}">
+            <div class="provider-header">
+              <div class="provider-name">
+                <div class="provider-icon ${p.iconClass}">${p.icon}</div>
+                ${p.label}
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${hasSaved ? `<span class="badge badge-saved">Saved</span>` : ''}
+                <span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">${isActive ? 'Active' : 'Inactive'}</span>
+              </div>
+            </div>
+            ${preview ? `<div class="key-preview">Current key: ${preview}</div>` : ''}
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${p.hint}</div>
+            <div class="input-row">
+              <input type="password" class="input-field" id="inp-${p.id}"
+                placeholder="${p.placeholder}" autocomplete="new-password" />
+              <button class="btn btn-accent btn-sm" onclick="saveKey('${p.id}')">Save</button>
+            </div>
+            <div class="card-actions">
+              ${!isActive && hasSaved ? `<button class="btn btn-green btn-sm" onclick="activateKey('${p.id}')">Set as Active</button>` : ''}
+              <button class="btn btn-outline btn-sm" id="testbtn-${p.id}" onclick="testKey('${p.id}')">Test Key</button>
+              ${hasSaved ? `<button class="btn btn-red btn-sm" onclick="deleteKey('${p.id}')">Delete Key</button>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    async function saveKey(provider) {
+      const inp = document.getElementById('inp-' + provider);
+      const val = inp.value.trim();
+      if (!val) { toast('Please enter an API key', 'error'); return; }
+      const d = await apiFetch('/dashboard/api/keys', {
+        method: 'POST',
+        body: JSON.stringify({ provider, api_key: val })
+      });
+      if (d.success) {
+        toast(d.message, 'success');
+        inp.value = '';
+        loadKeys();
+      } else {
+        toast(d.error || 'Save failed', 'error');
+      }
+    }
+
+    async function activateKey(provider) {
+      const d = await apiFetch(`/dashboard/api/keys/${provider}/activate`, { method: 'POST' });
+      if (d.success) {
+        toast(d.message, 'success');
+        loadKeys();
+      } else {
+        toast(d.error || 'Failed to activate', 'error');
+      }
+    }
+
+    async function deleteKey(provider) {
+      if (!confirm(`Delete the ${provider} API key? This cannot be undone.`)) return;
+      const d = await apiFetch(`/dashboard/api/keys/${provider}`, { method: 'DELETE' });
+      if (d.success) {
+        toast(`${provider} key deleted`, 'success');
+        loadKeys();
+      } else {
+        toast(d.error || 'Delete failed', 'error');
+      }
+    }
+
+    async function testKey(provider) {
+      const btn = document.getElementById('testbtn-' + provider);
+      const inp = document.getElementById('inp-' + provider);
+      const keyToTest = inp.value.trim() || null; // use typed value or fall back to saved key
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+      const body = { provider };
+      if (keyToTest) body.api_key = keyToTest;
+      const d = await apiFetch('/dashboard/api/keys/validate', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      btn.disabled = false;
+      btn.innerHTML = 'Test Key';
+      if (d.valid) {
+        toast(`✅ ${provider.charAt(0).toUpperCase()+provider.slice(1)} key is valid`, 'success');
+      } else {
+        toast(`❌ ${d.message || 'Key validation failed'}`, 'error');
+      }
+    }
+
+    // ── Documents ──────────────────────────────────────────────────────────
+
+    async function loadDocs() {
+      const tbody = document.getElementById('docs-tbody');
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="es-icon">⏳</div>Loading…</div></td></tr>';
+      const d = await apiFetch('/dashboard/api/documents');
+      const docs = d.documents || [];
+      if (!docs.length) {
+        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="es-icon">📂</div>No documents found. Upload a PDF to get started.</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = docs.map(doc => {
+        const statusInfo = statusBadge(doc.status, doc.on_disk);
+        const sizeStr = doc.file_size ? fmt(doc.file_size) : '—';
+        const pages = doc.page_count || '—';
+        const tracked = doc.id !== null;
+        const activeToggle = tracked
+          ? `<button class="btn btn-outline btn-sm" onclick="toggleDoc(${doc.id}, this)"
+               title="${doc.is_active ? 'Disable' : 'Enable'}">${doc.is_active ? '🔕 Disable' : '✅ Enable'}</button>`
+          : '';
+        const delBtn = tracked
+          ? `<button class="btn btn-red btn-sm" onclick="deleteDoc(${doc.id}, '${doc.filename}')">Delete</button>`
+          : '';
+        return `
+          <tr id="docrow-${doc.id || 'disk-' + doc.filename}">
+            <td>
+              <div class="doc-name">📄 ${escHtml(doc.original_name || doc.filename)}</div>
+              <div class="doc-meta">${doc.file_path || 'Data/' + doc.filename}</div>
+            </td>
+            <td>${sizeStr}</td>
+            <td>${pages}</td>
+            <td><span class="status-dot ${statusInfo.dot}"></span>${statusInfo.label}</td>
+            <td><div class="td-actions">${activeToggle}${delBtn}</div></td>
+          </tr>`;
+      }).join('');
+    }
+
+    function statusBadge(status, onDisk) {
+      if (!onDisk) return { dot: 'dot-red', label: 'File missing' };
+      switch (status) {
+        case 'indexed':        return { dot: 'dot-green',  label: 'Indexed' };
+        case 'pending_index':  return { dot: 'dot-yellow', label: 'Pending index' };
+        case 'untracked':      return { dot: 'dot-yellow', label: 'Untracked' };
+        case 'error':          return { dot: 'dot-red',    label: 'Error' };
+        default:               return { dot: 'dot-gray',   label: status || 'Unknown' };
+      }
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    async function toggleDoc(id, btn) {
+      btn.disabled = true;
+      const d = await apiFetch(`/dashboard/api/documents/${id}/toggle`, { method: 'POST' });
+      if (d.success) {
+        toast(d.is_active ? 'Document enabled' : 'Document disabled', 'success');
+        loadDocs();
+      } else {
+        toast(d.error || 'Toggle failed', 'error');
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteDoc(id, filename) {
+      if (!confirm(`Remove "${filename}" from the knowledge base?`)) return;
+      const removeFile = confirm(`Also permanently delete the PDF file from disk?\n\nOK = delete file\nCancel = keep file, remove database record only`);
+      const d = await apiFetch(`/dashboard/api/documents/${id}?remove_file=${removeFile}`, { method: 'DELETE' });
+      if (d.success) {
+        toast('Document removed', 'success');
+        loadDocs();
+      } else {
+        toast(d.error || 'Delete failed', 'error');
+      }
+    }
+
+    // ── Upload ─────────────────────────────────────────────────────────────
+
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput  = document.getElementById('fileInput');
+    const prog       = document.getElementById('uploadProg');
+    const progFill   = document.getElementById('uploadProgFill');
+
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', e => {
+      e.preventDefault(); uploadZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) uploadFile(file);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) uploadFile(fileInput.files[0]);
+      fileInput.value = '';
+    });
+    uploadZone.addEventListener('click', e => {
+      if (e.target.tagName !== 'LABEL') fileInput.click();
+    });
+
+    async function uploadFile(file) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        toast('Only PDF files are allowed', 'error'); return;
+      }
+      if (file.size > 52428800) {
+        toast('File exceeds 50 MB limit', 'error'); return;
+      }
+      prog.style.display = 'block';
+      progFill.style.width = '30%';
+
+      const fd = new FormData();
+      fd.append('file', file);
+
+      try {
+        progFill.style.width = '60%';
+        const resp = await fetch('/admin/upload', { method: 'POST', body: fd });
+        progFill.style.width = '100%';
+        const d = await resp.json();
+        if (resp.ok) {
+          toast(d.message || 'Uploaded successfully', 'success');
+          loadDocs();
+        } else {
+          toast(d.error || 'Upload failed', 'error');
+        }
+      } catch (err) {
+        toast('Upload failed: ' + err.message, 'error');
+      } finally {
+        setTimeout(() => { prog.style.display = 'none'; progFill.style.width = '0%'; }, 800);
+      }
+    }
+
+    // ── Re-index ───────────────────────────────────────────────────────────
+
+    async function triggerReindex() {
+      if (!confirm('Rebuild the search index from all active PDFs? This may take a few minutes.')) return;
+      const btn = document.getElementById('reindexBtn');
+      const rp  = document.getElementById('reindexProg');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Rebuilding…';
+      rp.style.display = 'block';
+      try {
+        const d = await apiFetch('/admin/reindex', { method: 'POST' });
+        if (d.success) {
+          toast('Index rebuilt successfully', 'success');
+          loadStats();
+          loadDocs();
+        } else {
+          toast(d.error || 'Reindex failed', 'error');
+        }
+      } catch (err) {
+        toast('Reindex error: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Rebuild Index';
+        rp.style.display = 'none';
+      }
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────
+
+    loadKeys();
+    loadStats();
+  </script>
+</body>
+</html>

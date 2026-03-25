@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Medical Chatbot</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f4f8;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+            color: white;
+            padding: 16px 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-content { flex: 1; text-align: center; }
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header p { font-size: 0.85rem; opacity: 0.85; margin-top: 4px; }
+        .clear-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .clear-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .message {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .user-message {
+            align-self: flex-end;
+            background: #0d6efd;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .bot-message {
+            align-self: flex-start;
+            background: white;
+            color: #333;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .citations {
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-left: 3px solid #0d6efd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        .citations-header {
+            font-weight: 600;
+            color: #0d6efd;
+            margin-bottom: 6px;
+        }
+        .citation-item {
+            display: inline-block;
+            background: white;
+            padding: 4px 8px;
+            margin: 2px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .citation-item:hover {
+            background: #e7f3ff;
+        }
+        .input-area {
+            padding: 16px 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+        #user-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 24px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        #user-input:focus { border-color: #0d6efd; }
+        #send-btn {
+            background: #0d6efd;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        #send-btn:hover { background: #0b5ed7; }
+        #send-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            align-self: flex-start;
+        }
+        .typing-indicator span {
+            width: 8px; height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        .welcome {
+            text-align: center;
+            color: #888;
+            padding: 40px 20px;
+        }
+        .welcome h2 { color: #0d6efd; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="width: 120px;"></div>
+        <div class="header-content">
+            <h1>Medical Chatbot</h1>
+            <p>Powered by {{ active_provider }} &middot; LangChain &amp; FAISS</p>
+        </div>
+        <button class="clear-btn" onclick="clearConversation()">🗑️ Clear History</button>
+    </div>
+
+    <div class="chat-container" id="chat-container">
+        <div class="welcome">
+            <h2>Welcome!</h2>
+            <p>Ask me any medical question and I'll help you find answers.</p>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="Type your medical question..." autocomplete="off">
+        <button id="send-btn" onclick="sendMessage()">&#10148;</button>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        async function loadHistory() {
+            try {
+                const response = await fetch('/history');
+                const data = await response.json();
+                if (!data.history || data.history.length === 0) return;
+
+                const welcome = document.querySelector('.welcome');
+                if (welcome) welcome.remove();
+
+                data.history.forEach(item => {
+                    const userMsg = document.createElement('div');
+                    userMsg.className = 'message user-message';
+                    userMsg.textContent = item.question;
+                    chatContainer.appendChild(userMsg);
+
+                    const botMsg = document.createElement('div');
+                    botMsg.className = 'message bot-message';
+                    botMsg.textContent = item.answer;
+                    chatContainer.appendChild(botMsg);
+                });
+
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            } catch (e) {
+                console.error('Could not load chat history:', e);
+            }
+        }
+
+        loadHistory();
+
+        function addMessage(text, isUser) {
+            const welcome = document.querySelector('.welcome');
+            if (welcome) welcome.remove();
+
+            const msg = document.createElement('div');
+            msg.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
+            msg.textContent = text;
+            chatContainer.appendChild(msg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return msg;
+        }
+        
+        function createBotMessage() {
+            const welcome = document.querySelector('.welcome');
+            if (welcome) welcome.remove();
+
+            const msg = document.createElement('div');
+            msg.className = 'message bot-message';
+            msg.textContent = '';
+            chatContainer.appendChild(msg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return msg;
+        }
+
+        function showTyping() {
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.id = 'typing';
+            indicator.innerHTML = '<span></span><span></span><span></span>';
+            chatContainer.appendChild(indicator);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideTyping() {
+            const indicator = document.getElementById('typing');
+            if (indicator) indicator.remove();
+        }
+
+        async function sendMessage() {
+            const msg = userInput.value.trim();
+            if (!msg) return;
+
+            addMessage(msg, true);
+            userInput.value = '';
+            sendBtn.disabled = true;
+            showTyping();
+
+            try {
+                const formData = new FormData();
+                formData.append('msg', msg);
+
+                const response = await fetch('/get', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                hideTyping();
+                const botMessage = createBotMessage();
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let sources = null;
+
+                while (true) {
+                    const {done, value} = await reader.read();
+                    
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, {stream: true});
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.sources) {
+                                    sources = data.sources;
+                                } else if (data.done) {
+                                    if (sources && sources.length > 0) {
+                                        const citationsDiv = document.createElement('div');
+                                        citationsDiv.className = 'citations';
+                                        
+                                        const header = document.createElement('div');
+                                        header.className = 'citations-header';
+                                        header.textContent = '📚 Sources:';
+                                        citationsDiv.appendChild(header);
+                                        
+                                        sources.forEach(source => {
+                                            const citation = document.createElement('span');
+                                            citation.className = 'citation-item';
+
+                                            const meta = source.metadata || {};
+                                            let citationText = meta.source || 'Medical Document';
+                                            if (meta.page !== undefined && meta.page !== null) {
+                                                citationText += `, page ${meta.page}`;
+                                            }
+                                            citation.textContent = citationText;
+                                            
+                                            citationsDiv.appendChild(citation);
+                                        });
+                                        
+                                        botMessage.appendChild(citationsDiv);
+                                    }
+                                    break;
+                                } else if (data.token) {
+                                    botMessage.textContent += data.token;
+                                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error('Error parsing SSE data:', e);
+                            }
+                        }
+                    }
+                }
+                
+                if (!botMessage.textContent) {
+                    botMessage.textContent = 'Sorry, I could not generate a response. Please try again.';
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                hideTyping();
+                addMessage('Sorry, something went wrong. Please try again.', false);
+            }
+
+            sendBtn.disabled = false;
+            userInput.focus();
+        }
+
+        async function clearConversation() {
+            if (!confirm('Are you sure you want to clear the conversation history? This will reset the chat context.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/clear-history', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    chatContainer.innerHTML = '<div class="welcome"><h2>New Conversation Started!</h2><p>Ask me any medical question and I\'ll help you find answers.</p></div>';
+                } else {
+                    alert('Failed to clear conversation history. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error clearing history:', error);
+                alert('An error occurred while clearing history.');
+            }
+        }
+    </script>
+</body>
+</html>

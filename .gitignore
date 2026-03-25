@@ -1,0 +1,74 @@
+# Environment
+.env
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Data (PDFs not committed — rebuild index from them locally)
+Data/*.pdf
+
+# Generated artifacts
+faiss_index/
+logs/
+*.db
+*.sqlite3
+
+# CI/CD & test artifacts
+coverage.xml
+coverage/
+htmlcov/
+.coverage
+bandit-report.json
+retrieval_evaluation_results.json
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.backup
+*.bak
+
+# Log files in root
+*.log
+
+# Claude Code internal state
+.claude/
+
+# Stale / superseded files
+app_multitenant.py
+store_index_multitenant.py
+src/database_multitenant.py
+src/multitenant_vector_store.py
+src/operator_routes.py
+src/widget_routes.py
+src/analytics_routes.py
+src/advanced_analytics.py
+src/llm_providers.py
+src/security.py
+static/widget.js
+templates/embed.html
+templates/landing.html
+templates/operator_dashboard.html
+templates/operator_login.html
+templates/operator_register.html
+templates/widget_demo.html
+.env.production.template
+template.sh
+medbot-react/

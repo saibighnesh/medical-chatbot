@@ -1,0 +1,42 @@
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Dev / test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+bandit-report.json
+retrieval_evaluation_results.json
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Generated at runtime — injected via Docker volumes
+faiss_index/
+logs/
+*.db
+*.sqlite3
+
+# Docs and configs not needed inside image
+*.md
+CLAUDE.md
+pyproject.toml
+.flake8
+pytest.ini
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment secrets — NEVER copy into image
+.env

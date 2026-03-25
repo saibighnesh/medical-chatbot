@@ -1,0 +1,17 @@
+[flake8]
+max-line-length = 120
+extend-ignore =
+    # E203: whitespace before ':' (black disagrees with flake8 here)
+    E203,
+    # W503: line break before binary operator (PEP 8 updated; black uses W504 style)
+    W503
+exclude =
+    __pycache__,
+    .git,
+    venv,
+    .venv,
+    faiss_index,
+    *.egg-info
+per-file-ignores =
+    # Allow unused imports in __init__ files
+    __init__.py: F401

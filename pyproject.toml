@@ -1,0 +1,21 @@
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | venv
+  | __pycache__
+  | faiss_index
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+skip_glob = ["venv/*", ".venv/*", "faiss_index/*"]
+
+[tool.bandit]
+skips = ["B101", "B601"]
+exclude_dirs = ["venv", ".venv", "tests"]

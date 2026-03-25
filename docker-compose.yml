@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  medical-chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: medical-chatbot
+    ports:
+      - "8080:8080"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:////app/data/production.db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./Data:/app/Data:ro
+      - ./faiss_index:/app/faiss_index:ro
+      - chatbot-data:/app/data
+      - chatbot-logs:/app/logs
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - chatbot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: medical-chatbot-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - chatbot-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    container_name: medical-chatbot-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - medical-chatbot
+    restart: unless-stopped
+    networks:
+      - chatbot-network
+
+volumes:
+  chatbot-data:
+    driver: local
+  chatbot-logs:
+    driver: local
+  redis-data:
+    driver: local
+  nginx-logs:
+    driver: local
+
+networks:
+  chatbot-network:
+    driver: bridge

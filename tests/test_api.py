@@ -183,6 +183,32 @@ class TestChatRoute:
             assert r.status_code == 200
             _ = r.data  # consume the SSE stream to prevent request-context leaks
 
+    def test_full_llm_path_high_confidence(self, client, mock_retriever, mock_llm):
+        """Cover lines 414-480: normal streaming path when 3+ docs give confidence >= 0.8."""
+        # 3 docs → confidence = 0.8 → LLM is actually called
+        mock_retriever.invoke.return_value = [
+            Mock(page_content=f"Medical content {i}", metadata={"source": "book.pdf", "page": i})
+            for i in range(3)
+        ]
+        mock_chunk = Mock()
+        mock_chunk.content = "Diabetes management requires diet and exercise."
+        mock_llm.stream.return_value = iter([mock_chunk])
+        try:
+            response = client.post("/get", data={"msg": "How do I manage diabetes?"})
+            assert response.status_code == 200
+            events = read_sse(response.data)
+            tokens = [e.get("token", "") for e in events if "token" in e]
+            assert any(tokens), "Expected at least one LLM token"
+            assert any(e.get("done") for e in events)
+        finally:
+            # Restore original 1-doc state for subsequent tests
+            mock_retriever.invoke.return_value = [
+                Mock(
+                    page_content="Diabetes is a chronic condition affecting blood sugar.",
+                    metadata={"source": "medical_book.pdf", "page": 1},
+                )
+            ]
+
 
 # ---------------------------------------------------------------------------
 # Clear history route

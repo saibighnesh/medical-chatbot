@@ -143,7 +143,7 @@ jobs:
       # are tagged @pytest.mark.integration and run separately (see integration.yml).
       - name: Run unit & API tests
         run: |
-          pytest tests/test_api.py tests/test_helper.py \
+          pytest tests/test_api.py tests/test_helper.py tests/test_database.py \
             -v \
             --cov=src --cov=app \
             --cov-report=xml:coverage.xml \

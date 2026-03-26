@@ -174,12 +174,14 @@ class TestChatRoute:
         for msg in msgs:
             r = client.post("/get", data={"msg": msg})
             assert r.status_code == 200
+            _ = r.data  # consume the SSE stream to prevent request-context leaks
 
     def test_unicode_input_handled(self, client):
         msgs = ["¿Qué es diabetes?", "什么是糖尿病？", "مرض السكري"]
         for msg in msgs:
             r = client.post("/get", data={"msg": msg})
             assert r.status_code == 200
+            _ = r.data  # consume the SSE stream to prevent request-context leaks
 
 
 # ---------------------------------------------------------------------------

@@ -4,7 +4,10 @@ extend-ignore =
     # E203: whitespace before ':' (black disagrees with flake8 here)
     E203,
     # W503: line break before binary operator (PEP 8 updated; black uses W504 style)
-    W503
+    W503,
+    # E501: line too long — black enforces line length; string literals inside SQL
+    #       cannot be auto-wrapped, so we suppress E501 and rely on black instead
+    E501
 exclude =
     __pycache__,
     .git,

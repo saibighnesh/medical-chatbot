@@ -78,7 +78,7 @@ jobs:
             --timeout=300
 
       - name: Upload integration coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: coverage-integration.xml
           flags: integration
